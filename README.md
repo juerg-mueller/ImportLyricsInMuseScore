@@ -1,2 +1,2 @@
 # ImportLyricsInMuseScore
-Import Lyrics in MuseScore from Midi
+Imports Lyrics from Midi in MuseScore
