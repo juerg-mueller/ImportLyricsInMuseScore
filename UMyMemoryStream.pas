@@ -341,10 +341,10 @@ end;
 
 function TMyMemoryStream.MakeBytes: TBytes;
 begin
-  SetLength(result, Size);
-  Move(PByte(Memory)[0], result[0], Size);
+  SetLength(Result, Size);
+  if Size > 0 then
+    Move(PByte(Memory)[0], result[0], Size);
 end;
-
 
 end.
 

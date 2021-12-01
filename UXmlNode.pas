@@ -15,9 +15,6 @@ type
 
 
   KXmlNode = class
-  private
-    function GetChild_(Idx: integer): KXmlNode;
-  public
     ChildNodes: array of KXmlNode;
     Attrs: array of KXmlAttr;
     Value: string;
@@ -33,9 +30,6 @@ type
     procedure InsertChildNode(Index: integer; Child_: KXmlNode);
     procedure AppendChildNode(Child_: KXmlNode); Overload;
     function ChildNodesCount: integer;
-    function ChildCount(Nam: string): integer;
-    function CopyTree: KXmlNode;
-    function Copy: KXmlNode;
 
     procedure AppendAttr(Name_, Value_: string); overload;
     procedure AppendAttr(Name_: string; Value_: integer); overload;
@@ -45,10 +39,8 @@ type
     procedure BuildStream(Stream: TMyMemoryStream; Level: integer; Wln: boolean);
     procedure RemoveChild(Child: KXmlNode);
     function GetChildIndex(Child: KXmlNode): integer;
-    function GetFirstIndex(Nam: string): integer;
     procedure PurgeChild(Index: integer);
     function HasChild(Name_: string): KXmlNode;
-    function GetChild(Name: string; var Child: KXmlNode): boolean;
     function DeleteAttribute(Attribute: string): boolean;
     function AttributeIdx(Attribute: string): integer;
     function HasAttribute(Attribute: string): boolean;
@@ -56,18 +48,22 @@ type
     procedure SetAttributes(const Idx: string; const Value: string);
     function LastNode: KXmlNode;
     function GetXmlValue: AnsiString;
+    function GetChild(Name: string; var Child: KXmlNode): boolean;
+    function GetChildNode(Idx: integer): KXmlNode;
+    function CopyTree: KXmlNode;
+    function GetFirstIndex(Nam: string): integer;
 
     //MuseScore
     procedure MergeStaff(var Staff3: KXmlNode);
     function ExtractVoice(VoiceIndex: integer; StaffId: integer): KXmlNode;
-    function MakeStaffArray(var Score: KXmlNode): boolean;
 
     class function BuildMemoryStream(Root: KXmlNode): TMyMemoryStream;
 
-    property Child[Idx: integer]: KXmlNode read GetChild_; default;
+
     property Attributes[const Name: string]: string read GetAttribute write SetAttributes;
     property Count: integer read ChildNodesCount;
     property XmlValue: AnsiString read GetXmlValue;
+    property Child[Idx: integer]: KXmlNode read GetChildNode; default;
   end;
 
 const
@@ -107,23 +103,6 @@ begin
   Name := '';
 
   inherited;
-end;
-
-function  KXmlNode.GetChild_(Idx: integer): KXmlNode;
-begin
-  result := nil;
-  if (Idx >= 0) and (Idx < Count) then
-    result := ChildNodes[Idx];
-end;
-
-function KXmlNode.ChildCount(Nam: string): integer;
-var
-  i: integer;
-begin
-  result := 0;
-  for i := 0 to Count-1 do
-    if ChildNodes[i].Name = Nam then
-      inc(result);
 end;
 
 function NewXmlNode(Name_: string; Value_: string = ''): KXmlNode;
@@ -201,19 +180,6 @@ begin
     dec(result);
 end;
 
-function KXmlNode.GetFirstIndex(Nam: string): integer;
-var
-  i: integer;
-begin
-  result := -1;
-  for i := 0 to Count-1 do
-    if Child[i].Name = Nam then
-    begin
-      result := i;
-      break;
-    end;
-end;
-
 procedure KXmlNode.RemoveChild(Child: KXmlNode);
 begin
   PurgeChild(GetChildIndex(Child));
@@ -239,18 +205,12 @@ begin
   result := nil;
   for i := 0 to Count-1 do
   begin
-    if (ChildNodes[i] <> nil) and (ChildNodes[i].Name = Name_) then
+    if ChildNodes[i].Name = Name_ then
     begin
       result := ChildNodes[i];
       break;
     end;
   end;
-end;
-
-function KXmlNode.GetChild(Name: string; var Child: KXmlNode): boolean;
-begin
-  Child := HasChild(Name);
-  result := Child <> nil;
 end;
 
 function KXmlNode.AttributeIdx(Attribute: string): integer;
@@ -489,6 +449,54 @@ begin
   result := UTF8encode(s);
 end;
 
+function KXmlNode.GetChild(Name: string; var Child: KXmlNode): boolean;
+var
+  k: integer;
+begin
+  k := 0;
+  result := false;
+  Child := nil;
+
+  while not result and (k < Count) do
+  begin
+    Child := ChildNodes[k];
+    inc(k);
+    result := Child.Name = Name;
+  end;
+end;
+
+function KXmlNode.GetChildNode(Idx: integer): KXmlNode;
+begin
+  result := nil;
+  if (Idx >= 0) and (Idx < Count) then
+    result := ChildNodes[Idx];
+end;
+
+function KXmlNode.CopyTree: KXmlNode;
+var
+  i: integer;
+begin
+  result := KXmlNode.Create;
+  result.Name := Name;
+  result.Value := Value;
+  for i := 0 to Length(Attrs)-1 do
+    result.AppendAttr(Attrs[i].Name, Attrs[i].Value);
+  for i := 0 to Count-1 do
+    result.AppendChildNode(ChildNodes[i].CopyTree)
+end;
+
+function KXmlNode.GetFirstIndex(Nam: string): integer;
+var
+  i: integer;
+begin
+  result := -1;
+  for i := 0 to Count-1 do
+    if Child[i].Name = Nam then
+    begin
+      result := i;
+      break;
+    end;
+end;
 
 ///////////////////////////// MuseScore ////////////////////////////////////////
 
@@ -559,111 +567,6 @@ begin
     end;
   if not Ok then
     FreeAndNil(result);
-end;
-
-function KXmlNode.Copy: KXmlNode;
-var
-  i: integer;
-begin
-  result := NewXmlNode(Name, Value);
-  for i := 0 to Length(Attrs)-1 do
-    result.AppendAttr(Attrs[i].Name, Attrs[i].Value);
-end;
-
-
-function KXmlNode.CopyTree: KXmlNode;
-var
-  i: integer;
-begin
-  result := Copy;
-  for i := 0 to Count-1 do
-    result.AppendChildNode(ChildNodes[i].CopyTree);
-end;
-
-function KXmlNode.MakeStaffArray(var Score: KXmlNode): boolean;
-
-  function GetVoicesCount(Staff: KXmlNode): integer;
-  var
-    i: integer;
-    Node: KXmlNode;
-  begin
-    result := 0;
-    for i := 0 to Staff.Count-1 do
-    begin
-      Node := Staff[i];
-      if Node.Name = 'Measure' then
-      begin
-        result := Node.ChildCount('voice');
-        break;
-      end;
-    end;
-  end;
-
-  procedure DeleteVoice(Staff: KXmlNode; First: boolean);
-  var
-    i, k: integer;
-    Measure, Voice: KXmlNode;
-    FirstFound: boolean;
-  begin
-    for i := 0 to Staff.Count-1 do
-    begin
-      Measure := Staff[i];
-      if Measure.Name = 'Measure' then
-      begin
-        FirstFound := false;
-        for k := 0 to Measure.Count-1 do
-        begin
-          Voice := Measure[k];
-          if Voice.Name = 'voice' then
-          begin
-            if First then
-            begin
-              Measure.RemoveChild(Voice);
-              break;
-            end;
-            if not FirstFound then
-              FirstFound := true
-            else
-              Measure.RemoveChild(Voice);
-          end;
-        end;
-      end;
-    end;
-  end;
-
-var
-  i, k, iStaff: integer;
-  cnt: integer;
-  NewStaff, Measure, Staffs, Staff: KXmlNode;
-begin
-  Score := nil;
-  if Name <> 'Score' then
-    exit;
-
-  Score := KXmlNode.Create;
-  Score.Name := 'Score';
-  for i := 0 to Count-1 do
-    if ChildNodes[i].Name = 'Staff' then
-    begin
-      NewStaff := Score.AppendChildNode('Staffs');
-      NewStaff.InsertChildNode(NewStaff.Count, ChildNodes[i].CopyTree);
-    end;
-
-  for i := 0 to Score.Count-1 do
-  begin
-    Staffs := Score[i];
-    for k := 0 to Staffs.Count-1 do
-    begin
-      Staff := Staffs[k];
-      if GetVoicesCount(Staff) > 1 then
-      begin
-        NewStaff := Staff.CopyTree;
-        Staffs.InsertChildNode(Staffs.Count, NewStaff);
-        DeleteVoice(Staff, false);
-        DeleteVoice(NewStaff, true);
-      end;
-    end;
-  end;
 end;
 
 end.

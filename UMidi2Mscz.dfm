@@ -59,11 +59,11 @@ object Form1: TForm1
     ParentFont = False
   end
   object OpenDialog1: TOpenDialog
-    Left = 480
-    Top = 176
+    Left = 576
+    Top = 144
   end
   object SaveDialog1: TSaveDialog
-    Left = 160
-    Top = 160
+    Left = 88
+    Top = 128
   end
 end

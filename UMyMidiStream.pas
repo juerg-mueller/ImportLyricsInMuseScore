@@ -65,10 +65,13 @@ type
     function GetBytes: string;
     function GetAnsi: AnsiString;
     function GetInt: cardinal;
+    function GetAnsiChar(Idx: integer): AnsiChar;
+    procedure SetAnsiChar(Idx: integer; c: AnsiChar);
 
     property str: String read GetBytes;
     property ansi: AnsiString read GetAnsi;
     property int: cardinal read GetInt;
+    property char_[Idx: integer]: Ansichar read GetAnsiChar write SetAnsiChar; default;
   end;
   PMidiEvent = ^TMidiEvent;
 
@@ -208,6 +211,20 @@ begin
     result := (result shl 8) + Bytes[i];
 end;
 
+function TMidiEvent.GetAnsiChar(Idx: integer): AnsiChar;
+begin
+  result := #0;
+  if (Idx >= 0) and (Idx < Length(bytes)) then
+    result := AnsiChar(bytes[Idx]);
+end;
+
+procedure TMidiEvent.SetAnsiChar(Idx: integer; c: AnsiChar);
+begin
+  if (Idx >= 0) and (Idx < Length(bytes)) then
+    bytes[Idx] := byte(c);
+end;
+
+
 function BytesToAnsiString(const Bytes: array of byte): AnsiString;
 var
   i: integer;
@@ -335,15 +352,22 @@ end;
 function TDetailHeader.GetRaster(p: integer): integer;
 var
   s: integer;
+  delta1, delta2: integer;
+  res1, res2: integer;
 begin
   if p < 0 then
     result := -GetRaster(-p)
-  else
-  if p = DeltaTimeTicks  div 8 - 1 then
-    result := DeltaTimeTicks  div 8
   else begin
     s := GetSmallestTicks;
-    result := s*((p + 2*s div 3) div s);
+    res1 := s*((p + 2*s div 3) div s);
+    delta1 := abs(p - res1);
+    s := 2*s div 3; // Triole
+    res2 := s*((p + 2*s div 3) div s);
+    delta2 := abs(p - res2);
+    if delta1 <= delta2 then
+      result := res1
+    else
+      result := res2;
   end;
 end;
 
@@ -426,13 +450,23 @@ var
   h, d, p: integer;
   n, f: string;
 begin
-  result := 0;
-  p := Pos('/', duration);
-  if p > 0 then
+  if LowerCase(duration) = 'measure' then
   begin
-    n := Copy(Duration, 1, p-1);
-    f := Copy(Duration, p+1, length(duration));
-    result := 4*DeltaTimeTicks*StrToInt(n) div StrToInt(f);
+    result := TicksPerMeasure;
+    exit;
+  end;
+  result := GetFraction_(duration);
+  if result > 0 then   // 128th
+  begin
+    result := 4*DeltaTimeTicks div result;
+  end else begin
+    p := Pos('/', duration);
+    if p > 0 then
+    begin
+      n := Copy(Duration, 1, p-1);
+      f := Copy(Duration, p+1, length(duration));
+      result := 4*DeltaTimeTicks*StrToInt(n) div StrToInt(f);
+    end;
   end;
   d := StrToIntDef(dots, 0);
   h := result;
@@ -629,7 +663,7 @@ var
 begin
   result := '?';
   idx := 128;
-  for i := High(NoteNames) downto 1 do
+  for i := High(NoteNames) downto 0 do
     if sLen = idx then
     begin
       result := NoteNames[i];

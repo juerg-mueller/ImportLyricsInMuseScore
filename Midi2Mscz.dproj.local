@@ -1,44 +1,44 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <BorlandProject>
 	<Transactions>
-    <Transaction>1899.12.30 00:00:00.000.736,=D:\git-win\MidiSequenzer\UMyMidiStream.pas</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.544,D:\git-win\MidiSequenzer\UMyMidiStream.pas=</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.580,D:\git-win\MidiSequenzer\UMidiDataStream.pas=</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.627,=D:\git-win\MidiSequenzer\UMidiDataStream.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.585,=C:\Users\Jürg Müller\Documents\Embarcadero\Studio\Projekte\Unit1.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.677,=C:\Users\Jürg Müller\Documents\Embarcadero\Studio\Projekte\Unit1.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.785,=D:\git-win\InsertLyrics\source\UEventArray.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.544,D:\git-win\MidiSequenzer\UMyMidiStream.pas=</Transaction>
     <Transaction>1899.12.30 00:00:00.000.899,D:\git-win\InsertLyrics\source\UEventArray.pas=</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.580,D:\git-win\MidiSequenzer\UMidiDataStream.pas=</Transaction>
     <Transaction>1899.12.30 00:00:00.000.104,=D:\git-win\InsertLyrics\source\UEventArray.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.929,D:\git-win\InsertLyrics\source\UEventArray.pas=</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.785,=D:\git-win\InsertLyrics\source\UEventArray.pas</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.322,C:\Users\Jürg Müller\Documents\Embarcadero\Studio\Projekte\Unit1.pas=D:\git-win\midi2mscz\UMidi2Mscz.pas</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.794,D:\git-win\InsertLyrics\source\UXmlParser.pas=</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.085,=D:\git-win\midi2mscz\UEventArray.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.181,=D:\git-win\midi2mscz\UMyMidiStream.pas</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.118,D:\git-win\MidiSequenzer\UMuseScore.pas=</Transaction>
     <Transaction>1899.12.30 00:00:00.000.669,=D:\git-win\MidiSequenzer\UMuseScore.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.118,D:\git-win\MidiSequenzer\UMuseScore.pas=</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.322,D:\git-win\midi2mscz\UMidi2Mscz.dfm=C:\Users\Jürg Müller\Documents\Embarcadero\Studio\Projekte\Unit1.dfm</Transaction>
     <Transaction>1899.12.30 00:00:00.000.962,=D:\git-win\InsertLyrics\source\UXmlParser.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.158,=D:\git-win\midi2mscz\UMyMemoryStream.pas</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.085,=D:\git-win\midi2mscz\UEventArray.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.255,D:\git-win\midi2mscz\Midi2Mscz.dproj=C:\Users\Jürg Müller\Documents\Embarcadero\Studio\Projekte\Project2.dproj</Transaction>
     <Transaction>1899.12.30 00:00:00.000.117,=D:\git-win\midi2mscz\UMidiDataStream.pas</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.255,C:\Users\Jürg Müller\Documents\Embarcadero\Studio\Projekte\Project2.dproj=D:\git-win\midi2mscz\Midi2Mscz.dproj</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.627,=D:\git-win\MidiSequenzer\UMidiDataStream.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.794,D:\git-win\InsertLyrics\source\UXmlParser.pas=</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.736,=D:\git-win\MidiSequenzer\UMyMidiStream.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.322,D:\git-win\midi2mscz\UMidi2Mscz.pas=C:\Users\Jürg Müller\Documents\Embarcadero\Studio\Projekte\Unit1.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.144,=D:\git-win\InsertLyrics\source\UMidiDataStream.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.071,D:\git-win\InsertLyrics\source\UMidiDataStream.pas=</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.470,D:\git-win\MidiSequenzer\UXmlNode.pas=</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.781,=D:\git-win\MidiSequenzer\UXmlNode.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.709,=D:\git-win\MidiSequenzer\UMyMemoryStream.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.781,=D:\git-win\MidiSequenzer\UXmlNode.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.251,=D:\git-win\midi2mscz\UXmlParser.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.021,=D:\git-win\InsertLyrics\source\UMyMidiStream.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.328,D:\git-win\InsertLyrics\source\UMyMidiStream.pas=</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.470,D:\git-win\MidiSequenzer\UXmlNode.pas=</Transaction>
     <Transaction>1899.12.30 00:00:00.000.184,D:\git-win\MidiSequenzer\UMyMemoryStream.pas=</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.322,C:\Users\Jürg Müller\Documents\Embarcadero\Studio\Projekte\Unit1.dfm=D:\git-win\midi2mscz\UMidi2Mscz.dfm</Transaction>
     <Transaction>1899.12.30 00:00:00.000.980,=D:\git-win\midi2mscz\USheetMusic.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.068,D:\git-win\midi2mscz\USheetMusic.pas=</Transaction>
     <Transaction>1899.12.30 00:00:00.000.973,=D:\git-win\InsertLyrics\source\UMyMemoryStream.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.399,D:\git-win\InsertLyrics\source\UMyMemoryStream.pas=</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.821,=D:\git-win\midi2mscz\UMuseScore.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.229,=D:\git-win\midi2mscz\UXmlNode.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.059,=D:\git-win\InsertLyrics\source\UXmlNode.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.668,D:\git-win\InsertLyrics\source\UXmlNode.pas=</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.229,=D:\git-win\midi2mscz\UXmlNode.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.821,=D:\git-win\midi2mscz\UMuseScore.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.669,D:\git-win\midi2mscz\UMuseScore.pas=</Transaction>
   </Transactions>
 </BorlandProject>
