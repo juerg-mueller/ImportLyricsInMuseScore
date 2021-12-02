@@ -167,7 +167,6 @@ var
   i: integer;
   d: double;
   takt, offset: integer;
-  Events: TMidiEventArray;
   bpm: double;
   l, k: integer;
 
@@ -307,7 +306,6 @@ begin
   if Text_ <> '' then
   begin
     AppendMetaEvent(1, UTF8encode(Text_));
-    AppendMetaEvent($10, Text_);
   end;
   if Copyright <> '' then
     AppendMetaEvent(2, UTF8encode(Copyright));

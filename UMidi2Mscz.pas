@@ -83,6 +83,23 @@ var
   i, k, len: integer;
 begin
   i := 1;
+  k := 1;
+  // remove all but lyrics und texts
+  while i < Length(Events) do
+  begin
+    if (Events[i].command = $ff) and (Events[i].d1 in [1, 5]) then
+    begin
+      Events[k] := Events[i];
+      inc(k);
+    end else begin
+      inc(Events[k-1].var_len, Events[i].var_len);
+
+    end;
+    inc(i);
+  end;
+  SetLength(Events, k);
+
+  i := 1;
   while i < Length(Events) do
   begin
     if (Events[i].command = $ff) then
@@ -154,7 +171,7 @@ end;
 function BuildLyricsTree(var LyricsTree: KXmlNode; const Events: TMidiEventArray;
                          Header: TDetailHeader): boolean;
 var
-  iEvent, i, k, len: integer;
+  iEvent, iEnd: integer;
   offset, midiOffset: integer;
   delta, no: integer;
   t, t1, t32takt: integer;
@@ -201,20 +218,18 @@ begin
       t32takt := 0;
     end;
     delta := midiOffset - offset;
-    i := iEvent;
-    if i = 15 then
-      i := i;
+    iEnd := iEvent;
     NextLyrics := delta = 0;
     //  Lyrics an derselben Stelle ermitteln
-    while (delta = 0) and (i < Length(Events)) do
+    while (delta = 0) and (iEnd < Length(Events)) do
     begin
-      if Header.GetRaster(Events[i].var_len) = 0 then
-        inc(i)
+      if Header.GetRaster(Events[iEnd].var_len) = 0 then
+        inc(iEnd)
       else
-        delta := Header.GetRaster(Events[i].var_len);
+        delta := Header.GetRaster(Events[iEnd].var_len);
     end;
-    if i = Length(Events) then
-      dec(i);
+    if iEnd = Length(Events) then
+      dec(iEnd);
     // Taktgrenze prüfen
     if Header.TicksPerMeasure < offset mod Header.TicksPerMeasure + delta then
       delta := Header.TicksPerMeasure - offset mod Header.TicksPerMeasure;
@@ -240,7 +255,7 @@ begin
     if NextLyrics then
     begin
       no := 0;
-      while iEvent <= i do
+      while iEvent <= iEnd do
       begin
         s := UTF8ToString(Events[iEvent].ansi);
         if trim(s) <> '' then
@@ -276,10 +291,7 @@ end;
 
 procedure AddVoice(FirstStaff: KXmlNode; const LyricsTree: KXmlNode; Header: TDetailHeader);
 var
-  iTree, offset, midiOffset, delta, iStaff: integer;
-  Measure, Staff, Rest, Voice, Chord, Child: KXmlNode;
-  duration, Len, relOffset, no: integer;
-  sLen, s: string;
+  iTree, iStaff: integer;
   FirstVoice: integer;
 begin
   iStaff := 0;
@@ -288,7 +300,6 @@ begin
   begin
     if FirstStaff[iStaff].Name = 'Measure' then
     begin
-      relOffset := offset;
       FirstVoice := 0;
       while (FirstVoice < FirstStaff[iStaff].Count-1) and (FirstStaff[iStaff][FirstVoice].Name <> 'voice') do
         inc(FirstVoice);
@@ -366,8 +377,6 @@ begin
       Voice1 := nil;
       Voice2 := nil;
       iVoice := 0;
-      if iStaff = 22 then
-        i := i;
       // beide Stimmen sind im gleichen Takt nacheinander
       while (iVoice < Measure.Count) and (Voice2 = nil) do
       begin
@@ -478,7 +487,6 @@ var
   Ext: string;
   i, k, iScore: integer;
   iStaff, iVoice, iChord, iMeasure: integer;
-  staffCount: integer;
   MidiEvents: TMidiEventArray;
   Tracks: TTrackEventArray;
   LyricStaffNo: integer;
@@ -486,7 +494,6 @@ begin
   result := false;
   Ext := ExtractFileExt(FileName);
   SetLength(FileName, Length(FileName) - Length(Ext));
-  Events := nil;
 
   if not FileExists(FileName + '.mid') then
   begin
@@ -504,7 +511,7 @@ begin
     Events.Free;
     exit;
   end;
-  Events.SaveSimpleMidiToFile(FileName + '.txt');
+//  Events.SaveSimpleMidiToFile(FileName + '.txt');
   Events.DetailHeader.smallestFraction := 16; // 32nd
   SetLength(hasText, Events.TrackCount);
   SetLength(hasSound, Events.TrackCount);
@@ -530,6 +537,10 @@ begin
         inc(hasSound[i]);
     end;
     if (hasSound[i] = 0) and (hasText[i] > 10) and (hasLyrics[i] = 0) then
+      KaraokeChannel := i
+    else
+    if ((KaraokeChannel < 0) and (hasLyrics[i] > 10)) or
+       (hasLyrics[i] > hasLyrics[KaraokeChannel]) then
       KaraokeChannel := i;
   end;
 
@@ -575,7 +586,6 @@ begin
   end;
 
   // remove lyrics
-  staffCount := 0;
   FirstStaff := nil;
   lyricsStaff := -1;
   LyricStaffNo := -1;
@@ -600,7 +610,6 @@ begin
         FirstStaff := Staff;
       if FirstStaff = nil then
         FirstStaff := Staff;
-      inc(staffCount);
       for iStaff := 0 to Staff.Count-1 do
       begin
         Measure := Staff[iStaff];
@@ -667,7 +676,7 @@ begin
            exit;
       end;
       Root.SaveToMsczFile(FileName + '_.mscz');
-//      Root.SaveToXmlFile(FileName + '_.xml', '<?xml version="1.0" encoding="UTF-8"?>'#13#10);
+      Root.SaveToXmlFile(FileName + '_.xml', '<?xml version="1.0" encoding="UTF-8"?>'#13#10);
     finally
       Root.Free;
       Events.Free;

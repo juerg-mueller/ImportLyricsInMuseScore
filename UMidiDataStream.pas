@@ -843,10 +843,10 @@ end;
 
 procedure TMidiSaveStream.AppendHeaderMetaEvents(const Details: TDetailHeader);
 begin
-  AppendMetaEvent($51, Details.GetMetaBeats51);
+  AppendMetaEvent($51, string(Details.GetMetaBeats51));
   if (Details.CDur <> 0) or Details.Minor then
-    AppendMetaEvent($59, Details.GetMetaDurMinor59);
-  AppendMetaEvent($58, Details.GetMetaMeasure58);
+    AppendMetaEvent($59, string(Details.GetMetaDurMinor59));
+  AppendMetaEvent($58, string(Details.GetMetaMeasure58));
 end;
 
 procedure TMidiSaveStream.AppendTrackHead(delay: integer);
@@ -860,7 +860,7 @@ begin
   count := GetWord(10) + 1;
   SetWord(count, 10); // increment track count
   if (count = 1) and (Length(Titel) > 0) then
-    AppendMetaEvent(2, UTF8Encode(Titel));
+    AppendMetaEvent(2, string(UTF8Encode(Titel)));
 end;
 
 procedure TMidiSaveStream.AppendTrackEnd(IsLastTrack: boolean);
