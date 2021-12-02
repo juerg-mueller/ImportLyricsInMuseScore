@@ -1,5 +1,5 @@
 unit UMidi2Mscz;
-
+// Test Midi files: http://midkar.com
 interface
 
 uses
@@ -159,13 +159,6 @@ begin
     end else
       inc(Events[Length(Events)-1].var_len, Header.TicksPerMeasure -len);
   end;
-{
-  for i := Length(Events)-1 downto 1 do
-    if Events[i].var_len < 4 then
-    begin
-      inc(Events[i-1].var_len, Events[i].var_len);
-      Events[i].var_len := 0;
-    end;}
 end;
 
 function BuildLyricsTree(var LyricsTree: KXmlNode; const Events: TMidiEventArray;
@@ -179,18 +172,65 @@ var
   sLen, s: string;
   Voice, Rest, Child: KXmlNode;
   NextLyrics: boolean;
+  InTuplet: boolean;
 
-  procedure AddRest;
+{
+<Tuplet>
+            <color r="0" g="0" b="0" a="255"/>
+            <normalNotes>2</normalNotes>
+            <actualNotes>3</actualNotes>
+            <baseNote>eighth</baseNote>
+            <Number>
+              <style>Tuplet</style>
+              <text>3</text>
+              </Number>
+            </Tuplet>
+
+            <endTuplet/>
+            }
+  procedure AddRest(var InTuplet: boolean);
+  var
+    IsTuplet: boolean;
+    Tuplet, Child, Child1, BaseNote: KXmlNode;
   begin
+    BaseNote := nil;
+    IsTuplet := (Header.DeltaTimeTicks mod (3*delta div 2)) < 2;
+    if IsTuplet <> InTuplet then
+    begin
+      if IsTuplet then
+      begin
+        Tuplet := Voice.AppendChildNode('Tuplet');
+        Child := Tuplet.AppendChildNode('normalNotes');
+        Child.Value := '2';
+        Child := Tuplet.AppendChildNode('actualNotes');
+        Child.Value := '3';
+        BaseNote := Tuplet.AppendChildNode('baseNote');
+        Child := Tuplet.AppendChildNode('Number');
+        Child1 := Child.AppendChildNode('style');
+        Child1.Value := 'Tuplet';
+        Child1 := Child.AppendChildNode('text');
+        Child1.Value := '3';
+      end else
+        Voice.AppendChildNode('endTuplet');
+      InTuplet := IsTuplet;
+    end;
+
+    if IsTuplet then
+      delta := 3*delta div 2;
     t := 8*delta div Header.DeltaTimeTicks;
     t1 := t;
     sLen := GetLen(t, dot, t32takt);
     Rest := Voice.AppendChildNode('Rest');
     Rest.AppendChildNode('visible', '0');
     Child := Rest.AppendChildNode('durationType', sLen);
+    if BaseNote <> nil then
+      BaseNote.Value := sLen;
     if dot then
       Rest.AppendChildNode('dots', '1');
-    inc(offset, Header.DeltaTimeTicks*(t1-t) div 8);
+    t := Header.DeltaTimeTicks*(t1-t) div 8;
+    if IsTuplet then
+      t := 2*t div 3;
+    inc(offset, t);
     if (t1 = t) and result then
     begin
       result := false; // nicht quantisiert
@@ -208,6 +248,7 @@ begin
   result := true;
   iEvent := 1;
   offset := 0;
+  InTuplet := false;
   midiOffset := Events[0].var_len;
   Voice := nil;
   while result and (iEvent < Length(Events)) do
@@ -217,6 +258,8 @@ begin
       Voice := LyricsTree.AppendChildNode('voice');
       t32takt := 0;
     end;
+    if iEvent = 16 then
+      iEnd := iEvent;
     delta := midiOffset - offset;
     iEnd := iEvent;
     NextLyrics := delta = 0;
@@ -234,7 +277,7 @@ begin
     if Header.TicksPerMeasure < offset mod Header.TicksPerMeasure + delta then
       delta := Header.TicksPerMeasure - offset mod Header.TicksPerMeasure;
 
-    AddRest;
+    AddRest(InTuplet);
     if not result then
     begin
       result := true;
@@ -243,7 +286,7 @@ begin
         delta := Header.TicksPerMeasure - offset mod Header.TicksPerMeasure;
         if delta = 0 then
           delta := Header.TicksPerMeasure;
-        AddRest;
+        AddRest(InTuplet);
       until not Result or ((offset mod Header.TicksPerMeasure) = 0);
       while (iEvent < Length(Events)) and
             (offset > midiOffset) do
@@ -281,12 +324,16 @@ begin
   end;
 
   // letzten Takt füllen
-  if (Voice <> nil) then
-    while (offset mod Header.TicksPerMeasure) > 0 do
+  if result and (Voice <> nil) then
+  begin
+    while result and ((offset mod Header.TicksPerMeasure) > 0) do
     begin
       delta := Header.TicksPerMeasure - (offset mod Header.TicksPerMeasure);
-      AddRest;
+      InTuplet := false;
+      AddRest(InTuplet);
     end;
+    result := true;
+  end;
 end;
 
 procedure AddVoice(FirstStaff: KXmlNode; const LyricsTree: KXmlNode; Header: TDetailHeader);
@@ -324,22 +371,24 @@ var
   Voice1Copy: KXmlNode;
   Dur1, Dur2: integer;
   offset1, offset2: integer;
+  InTuplet1, InTuplet2: boolean;
 
-  function SearchNext(var iChord: integer; Voice: KXmlNode): boolean;
+  function SearchNext(var iChord: integer; var InTuplet: boolean;
+                      Voice: KXmlNode): boolean;
   begin
     if iChord < 0 then
       iChord := 0;
     while (iChord < Voice.Count) and
-          (Voice[iChord].Name <> 'Rest') and (Voice[iChord].Name <> 'Chord') and
-          (Voice[iChord].Name <> 'Tuplet') do
-      inc(iChord);
-    result := iChord < Voice.Count;
-    if result then
+          (Voice[iChord].Name <> 'Rest') and (Voice[iChord].Name <> 'Chord') do
     begin
-      result := Voice[iChord].Name <> 'Tuplet';
-      if not result then
-//        Application.MessageBox('Sorry, tuplets are not implemented yet!', 'Error');
+      if Voice[iChord].Name = 'Tuplet' then
+        InTuplet := true
+      else
+      if Voice[iChord].Name = 'endTuplet' then
+        InTuplet := false;
+      inc(iChord);
     end;
+    result := iChord < Voice.Count;
   end;
 
   function GetDur(Chord: KXmlNode): integer;
@@ -369,6 +418,8 @@ begin
   iStaff := 0;
   offset1 := 0;
   offset2 := 0;
+  InTuplet1 := false;
+  InTuplet2 := false;
   while (iStaff < FirstStaff.Count) and result do
   begin
     Measure := FirstStaff[iStaff];
@@ -397,8 +448,8 @@ begin
       while result and
             (iChord1 < Voice1.Count) and (iChord2 < Voice2.Count) do
       begin
-        result := SearchNext(iChord1, Voice1) and
-                  SearchNext(iChord2, Voice2);
+        result := SearchNext(iChord1, InTuplet1, Voice1) and
+                  SearchNext(iChord2, InTuplet2, Voice2);
         if not result then
           break;
 
@@ -411,7 +462,11 @@ begin
           Chord1.InsertChildNode(First, Lyrics.CopyTree);
         end;
         dur1 := GetDur(Chord1);
+        if InTuplet1 then
+          dur1 := 2*dur1 div 3;
         dur2 := GetDur(Chord2);
+        if InTuplet2 then
+          dur2 := 2*dur2 div 3;
         inc(offset1, dur1);
         inc(offset2, dur2);
         while (offset1 <> offset2) and
@@ -421,10 +476,12 @@ begin
           while (iChord1 < Voice1.Count) and (offset1 < offset2) do
           begin
             inc(iChord1);
-            if SearchNext(iChord1, Voice1) then
+            if SearchNext(iChord1, InTuplet1, Voice1) then
             begin
               Chord1 := Voice1[iChord1];
               dur1 := GetDur(Chord1);
+              if InTuplet1 then
+                dur1 := 2*dur1 div 3;
               inc(offset1, dur1);
             end;
           end;
@@ -432,10 +489,12 @@ begin
                 (iChord2 < Voice2.Count) and (offset1 > offset2) do
           begin
             inc(iChord2);
-            if SearchNext(iChord2, Voice2) then
+            if SearchNext(iChord2, InTuplet2, Voice2) then
             begin
               Chord2 := Voice2[iChord2];
               dur2 := GetDur(Chord2);
+              if InTuplet2 then
+                dur2 := 2*dur2 div 3;
               inc(offset2, dur2);
               if Chord2.HasChild('Lyrics') <> nil then
                 result := false;
@@ -512,7 +571,7 @@ begin
     exit;
   end;
 //  Events.SaveSimpleMidiToFile(FileName + '.txt');
-  Events.DetailHeader.smallestFraction := 16; // 32nd
+  Events.DetailHeader.smallestFraction := 16; // 16th
   SetLength(hasText, Events.TrackCount);
   SetLength(hasSound, Events.TrackCount);
   SetLength(hasLyrics, Events.TrackCount);
