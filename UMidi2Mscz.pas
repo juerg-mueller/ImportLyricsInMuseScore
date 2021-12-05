@@ -174,20 +174,6 @@ var
   NextLyrics: boolean;
   InTuplet: boolean;
 
-{
-<Tuplet>
-            <color r="0" g="0" b="0" a="255"/>
-            <normalNotes>2</normalNotes>
-            <actualNotes>3</actualNotes>
-            <baseNote>eighth</baseNote>
-            <Number>
-              <style>Tuplet</style>
-              <text>3</text>
-              </Number>
-            </Tuplet>
-
-            <endTuplet/>
-            }
   procedure AddRest(var InTuplet: boolean);
   var
     IsTuplet: boolean;
@@ -372,6 +358,7 @@ var
   Dur1, Dur2: integer;
   offset1, offset2: integer;
   InTuplet1, InTuplet2: boolean;
+  lyricsNo, No: integer;
 
   function SearchNext(var iChord: integer; var InTuplet: boolean;
                       Voice: KXmlNode): boolean;
@@ -456,10 +443,22 @@ begin
         Chord1 := Voice1[iChord1];
         Chord2 := Voice2[iChord2];
         First := Chord1.GetFirstIndex('Note');
+        // Rest hat keine "Note"
+        if First < 0 then
+          First := Chord1.Count;
         Lyrics := Chord2.HasChild('Lyrics');
         if Lyrics <> nil then
         begin
-          Chord1.InsertChildNode(First, Lyrics.CopyTree);
+          No := 0;
+          for lyricsNo := 0 to Chord2.Count-1 do
+          begin
+            Lyrics := Chord2.ChildNodes[lyricsNo];
+            if Lyrics.Name = 'Lyrics' then
+            begin
+              Chord1.InsertChildNode(First+no, Lyrics.CopyTree);
+              inc(no);
+            end;
+          end;
         end;
         dur1 := GetDur(Chord1);
         if InTuplet1 then
@@ -551,7 +550,7 @@ var
   LyricStaffNo: integer;
 begin
   result := false;
-  Ext := ExtractFileExt(FileName);
+  Ext := LowerCase(ExtractFileExt(FileName));
   SetLength(FileName, Length(FileName) - Length(Ext));
 
   if not FileExists(FileName + '.mid') then
@@ -605,6 +604,7 @@ begin
 
   i := 1;
   k := 1;
+  // Lyrics entfernen
   while (i < Length(Events.Track[KaraokeChannel+1])) do
   begin
     with Events.Track[KaraokeChannel+1][i] do
@@ -613,7 +613,8 @@ begin
       begin
         Events.Track[KaraokeChannel+1][k] := Events.Track[KaraokeChannel+1][i];
         inc(k);
-      end;
+      end else
+        inc(Events.Track[KaraokeChannel+1][k-1].var_len, Events.Track[KaraokeChannel+1][i].var_len);
     inc(i);
   end;
   SetLength(Events.Track[KaraokeChannel+1], k);
@@ -622,7 +623,7 @@ begin
      not FileExists(FileName + '.mscx') then
   begin
     Application.MessageBox(
-      PChar(Format('Neither the file "%s.mscz" nor the file "%s.mscx exists!',
+      PChar(Format('Neither the file "%s.mscz" nor the file "%s.mscx" exists!',
                    [FileName, FileName])), 'Error', MB_OK);
     exit;
   end;
@@ -720,6 +721,7 @@ begin
     result := BuildLyricsTree(LyricsTree, Events.Track[KaraokeChannel], Events.DetailHeader);
     if result then
     begin
+//      LyricsTree.SaveToXmlFile(FileName + '_tree.xml');
       AddVoice(FirstStaff, LyricsTree, Events.DetailHeader);
       ReduceVoice(FirstStaff, Events.DetailHeader);
     end;
@@ -735,7 +737,7 @@ begin
            exit;
       end;
       Root.SaveToMsczFile(FileName + '_.mscz');
-      Root.SaveToXmlFile(FileName + '_.xml', '<?xml version="1.0" encoding="UTF-8"?>'#13#10);
+//      Root.SaveToXmlFile(FileName + '_.xml', '<?xml version="1.0" encoding="UTF-8"?>'#13#10);
     finally
       Root.Free;
       Events.Free;
