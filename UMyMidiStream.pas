@@ -23,7 +23,7 @@ interface
 //{$endif}
 
 uses
-  SysUtils, Classes, Types, UMyMemoryStream;
+  SysUtils, Classes, Types, WinApi.Windows, UMyMemoryStream;
 
 Const
   cSimpleHeader = AnsiString('Header');
@@ -67,10 +67,13 @@ type
     function GetInt: cardinal;
     function GetAnsiChar(Idx: integer): AnsiChar;
     procedure SetAnsiChar(Idx: integer; c: AnsiChar);
+    function GetCodeStr(Idx: integer): string;
+    procedure SetCodeStr(Idx: integer; const s: string);
 
     property str: String read GetBytes;
     property ansi: AnsiString read GetAnsi;
     property int: cardinal read GetInt;
+    property code[Idx: integer]: string read GetCodeStr write SetCodeStr;
     property char_[Idx: integer]: Ansichar read GetAnsiChar write SetAnsiChar; default;
   end;
   PMidiEvent = ^TMidiEvent;
@@ -97,7 +100,8 @@ type
     function TicksPerMeasure: integer;
     function TicksToSec(Ticks: integer): integer;
     function TicksToString(Ticks: integer): string;
-    function SetTimeSignature(const Event: TMidiEvent; const Bytes: array of byte): boolean;
+    function SetTimeSignature(const Event: TMidiEvent; const Bytes: array of byte): boolean; overload;
+    function SetTimeSignature(const Event: TMidiEvent): boolean; overload;
     function SetBeatsPerMin(const Event: TMidiEvent; const Bytes: array of byte): boolean;
     function SetDurMinor(const Event: TMidiEvent; const Bytes: array of byte): boolean;
     function SetParams(const Event: TMidiEvent; const Bytes: array of byte): boolean;
@@ -106,6 +110,7 @@ type
     function GetMetaDurMinor59: AnsiString;
     function GetDur: string;
     function GetChordTicks(duration, dots: string): integer;
+    function MeasureRestTicks(t32takt: double): integer;
   end;
   PDetailHeader = ^TDetailHeader;
 
@@ -289,6 +294,11 @@ begin
   end;
 end;
 
+function TDetailHeader.SetTimeSignature(const Event: TMidiEvent): boolean;
+begin
+  result := SetTimeSignature(Event, Event.bytes);
+end;
+
 function TDetailHeader.SetDurMinor(const Event: TMidiEvent; const Bytes: array of byte): boolean;
 begin
   result := (Event.command = $ff) and (Event.d1 = $59) and (Event.d2 = 2) and (Length(Bytes) = 2);
@@ -442,7 +452,7 @@ end;
 
 function TDetailHeader.GetMetaDurMinor59: AnsiString;
 begin
-  result := AnsiChar(ShortInt(CDur and $f)) + AnsiChar(ord(Minor));
+  result := AnsiChar(ShortInt(CDur and $ff)) + AnsiChar(ord(Minor));
 end;
 
 function TDetailHeader.GetChordTicks(duration, dots: string): integer;
@@ -476,6 +486,11 @@ begin
     inc(result, h);
     dec(d);
   end;
+end;
+
+function TDetailHeader.MeasureRestTicks(t32takt: double): integer;
+begin
+  result := round(DeltaTimeTicks*t32takt / 8.0);
 end;
 
 
@@ -574,6 +589,40 @@ end;
 function TMidiEvent.IsEqualEvent(const Event: TMidiEvent): boolean;
 begin
   result := (command = Event.command) and (d1 = Event.d1) and (d2 = Event.d2);
+end;
+
+function TMidiEvent.GetCodeStr(Idx: integer): string;
+var
+  a: AnsiString;
+  l: integer;
+begin
+  a := ansi;
+  if (Idx <= 0) or (command <> $ff) or not (d1 in [1, 5, 6]) then
+    Idx := CP_UTF8;
+
+  l := Length(a);
+  if l > 0 then
+    l := MultiByteToWideChar(Idx, 0, @a[1], Length(a), nil, 0);
+  SetLength(result, l);
+  if l > 0 then
+    MultiByteToWideChar(Idx, 0, PAnsiChar(a), l, PWideChar(result), l);
+end;
+
+procedure TMidiEvent.SetCodeStr(Idx: integer; const s: string);
+var
+  a: AnsiString;
+  l: integer;
+begin
+  if (Idx <= 0) or (command <> $ff) or not (d1 in [1, 5, 6]) then
+    exit;
+
+  l := Length(s);
+
+  if l > 0 then
+    l := WideCharToMultiByte(Idx, 0, PWideChar(s), Length(s), nil, 0, nil, nil);
+  SetLength(a, l);
+  WideCharToMultiByte(Idx, 0, PWideChar(s), Length(s), PAnsiChar(a), l, nil, nil);
+  FillBytes(a);
 end;
 
 ////////////////////////////////////////////////////////////////////////////////

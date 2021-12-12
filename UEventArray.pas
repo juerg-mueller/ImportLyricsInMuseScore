@@ -31,6 +31,7 @@ type
   TChannelEventArray = array [0..15] of TMidiEventArray;
   TTrackEventArray = array of TMidiEventArray;
   TAnsiStringArray = array of AnsiString;
+  TSetOfByte = set of byte;
 
   TEventArray = class
   protected
@@ -55,6 +56,7 @@ type
     procedure SetNewTrackCount(Count: integer);
     function TrackCount: integer;
     function GetHeaderTrack: TMidiEventArray;
+    function InsertMeasureChanges: boolean;
 
     property TrackName: TAnsiStringArray read TrackName_;
     property TrackArr: TTrackEventArray read TrackArr_;
@@ -82,6 +84,8 @@ type
     class procedure InsertSecond(var Events: TMidiEventArray; const Event: TMidiEvent);
     class procedure Quantize(var Events: TMidiEventArray; const DetailHeader: TDetailHeader);
     class procedure DeleteTrack(Index: integer; Tracks: TTrackEventArray);
+    class procedure ReduceToMetaEvents(var Events: TMidiEventArray; d1: TSetOfByte);
+    class procedure CopyTrack(var Track1: TMidiEventArray; const Track2: TMidiEventArray);
   end;
 
 
@@ -349,6 +353,51 @@ begin
     TEventArray.Move_var_len(TrackArr[i]);
 end;
 
+function TEventArray.InsertMeasureChanges: boolean;
+var
+  iTrack, i, k: integer;
+  Header: TDetailHeader;
+  NewTrack: TMidiEventArray;
+  Ev: TMidiEvent;
+begin
+  iTrack := 0;
+  result := false;
+  Header := DetailHeader;
+  while not result and (iTrack < Length(TrackArr_)) do
+  begin
+    for i := 0 to Length(TrackArr_[iTrack])-1 do
+      if Header.SetTimeSignature(TrackArr_[iTrack][i]) then
+        result := true;
+    if not result then
+      inc(iTrack);
+  end;
+
+  if result then
+  begin
+    CopyTrack(Newtrack, TrackArr_[iTrack]);
+    TEventArray.ReduceToMetaEvents(NewTrack, [88]);
+    for i := 0 to Length(TrackArr)-1 do
+       if i <> iTrack then
+       begin
+         MergeTracks(TrackArr_[i], NewTrack);
+         // Taktwechsel muss an erster Stelle stehen
+         k := Length(TrackArr_[i])-1;
+         while k > 1 do
+         begin
+           if Header.SetTimeSignature(TrackArr_[i][k])  and
+              (TrackArr_[i][k-1].var_len = 0) then
+           begin
+             Ev := TrackArr_[i][k];
+             TrackArr_[i][k] := TrackArr_[i][k-1];
+             TrackArr_[i][k].var_len := Ev.var_len;
+             Ev.var_len := 0;
+             TrackArr_[i][k-1] := Ev;
+           end;
+           dec(k);
+         end;
+       end;
+  end;
+end;
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -520,7 +569,7 @@ var
   end;
 
 begin
-  if not TEventArray.HasSound(Events1) then
+  if Events1 = nil then
   begin
     Events1 := Events2;
     exit;
@@ -731,6 +780,34 @@ begin
   SetLength(Tracks, Length(Tracks)-1);
 end;
 
+class procedure TEventArray.ReduceToMetaEvents(var Events: TMidiEventArray; d1: TSetOfByte);
+var
+  i, k, len: integer;
+begin
+  i := 1;
+  k := 1;
+  // remove all but lyrics, texts, and measure changes
+  while i < Length(Events) do
+  begin
+    if (Events[i].command = $ff) and (Events[i].d1 in d1) then
+    begin
+      Events[k] := Events[i];
+      inc(k);
+    end else
+      inc(Events[k-1].var_len, Events[i].var_len);
+    inc(i);
+  end;
+  SetLength(Events, k);
+end;
+
+class procedure TEventArray.CopyTrack(var Track1: TMidiEventArray; const Track2: TMidiEventArray);
+var
+  i: integer;
+begin
+  SetLength(Track1, Length(Track2));
+  for i := 0 to Length(Track2)-1 do
+    Track1[i] := Track2[i];
+end;
 
 
 end.

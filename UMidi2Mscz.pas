@@ -13,6 +13,8 @@ type
     Label2: TLabel;
     Label3: TLabel;
     SaveDialog1: TSaveDialog;
+    cbxCodePage: TComboBox;
+    Label4: TLabel;
     procedure WMDropFiles(var Msg: TWMDropFiles); message WM_DROPFILES;
     procedure FormCreate(Sender: TObject);
   private
@@ -28,6 +30,8 @@ var
 implementation
 
 {$R *.dfm}
+
+{$define TEST}
 
 uses
   UMyMidiStream, UMidiDataStream, UEventArray, UXmlParser, UXmlNode;
@@ -84,12 +88,13 @@ var
 begin
   i := 1;
   k := 1;
-  // remove all but lyrics und texts
+  // remove all but lyrics, texts, and measure changes
   while i < Length(Events) do
   begin
-    if (Events[i].command = $ff) and (Events[i].d1 in [1, 5]) then
+    if (Events[i].command = $ff) and (Events[i].d1 in [1, 5, 88]) then
     begin
       Events[k] := Events[i];
+//      Header.SetTimeSignature(Events[k], Events[k].Bytes);
       inc(k);
     end else begin
       inc(Events[k-1].var_len, Events[i].var_len);
@@ -102,7 +107,8 @@ begin
   i := 1;
   while i < Length(Events) do
   begin
-    if (Events[i].command = $ff) then
+    if (Events[i].command = $ff) and
+       (Events[i].d1 in [1, 5]) then
     begin
       if Karaoke and (Events[i].d1 = 1) then
         Events[i].d1 := 5;
@@ -122,26 +128,29 @@ begin
   i := 2;
   while i < Length(Events) do
   begin
-    if Events[i][0] in [#10, #13] then
-    begin
-      if Events[i][0] = #10 then
-        Events[i][0] := '\'
-      else
-        Events[i][0] := '/';
-    end;
-    if (Events[i][0] = ' ') then
-    begin
-      Events[i-1].AppendByte(ord(' '));
-      with Events[i] do
+    if (Events[i].d1 <> 5) then
+    else begin
+      if Events[i][0] in [#10, #13] then
       begin
-        for k := 1 to Length(Bytes)-1 do
-          Bytes[k-1] := Bytes[k];
-        SetLength(Bytes, Length(Bytes)-1);
+        if Events[i][0] = #10 then
+          Events[i][0] := '\'
+        else
+          Events[i][0] := '/';
       end;
-    end else
-    if (Events[i][0] in ['/', '\']) and
-       (Events[i-1][Length(Events[i-1].Bytes)-1] <> ' ') then
-      Events[i-1].AppendByte(ord(' '));
+      if (Events[i][0] = ' ') then
+      begin
+        Events[i-1].AppendByte(ord(' '));
+        with Events[i] do
+        begin
+          for k := 1 to Length(Bytes)-1 do
+            Bytes[k-1] := Bytes[k];
+          SetLength(Bytes, Length(Bytes)-1);
+        end;
+      end else
+      if (Events[i][0] in ['/', '\']) and
+         (Events[i-1][Length(Events[i-1].Bytes)-1] <> ' ') then
+        Events[i-1].AppendByte(ord(' '));
+    end;
     inc(i);
   end;
 
@@ -162,17 +171,21 @@ begin
 end;
 
 function BuildLyricsTree(var LyricsTree: KXmlNode; const Events: TMidiEventArray;
-                         Header: TDetailHeader): boolean;
+                         Header: TDetailHeader; CodePage: integer): boolean;
 var
   iEvent, iEnd: integer;
   offset, midiOffset: integer;
   delta, no: integer;
-  t, t1, t32takt: integer;
+  t, t1: integer;
+  t32takt: double;
   dot: boolean;
   sLen, s: string;
   Voice, Rest, Child: KXmlNode;
   NextLyrics: boolean;
   InTuplet: boolean;
+  TaktNr: integer;
+  as_: AnsiString;
+  l: integer;
 
   procedure AddRest(var InTuplet: boolean);
   var
@@ -205,7 +218,7 @@ var
       delta := 3*delta div 2;
     t := 8*delta div Header.DeltaTimeTicks;
     t1 := t;
-    sLen := GetLen(t, dot, t32takt);
+    sLen := GetLen(t, dot, round(t32takt));
     Rest := Voice.AppendChildNode('Rest');
     Rest.AppendChildNode('visible', '0');
     Child := Rest.AppendChildNode('durationType', sLen);
@@ -213,7 +226,12 @@ var
       BaseNote.Value := sLen;
     if dot then
       Rest.AppendChildNode('dots', '1');
-    t := Header.DeltaTimeTicks*(t1-t) div 8;
+    t := t1-t;
+    if IsTuplet then
+      t32takt := t32takt - 2.0*t/ 3.0
+    else
+      t32takt := t32takt - t;
+    t := Header.DeltaTimeTicks*t div 8;
     if IsTuplet then
       t := 2*t div 3;
     inc(offset, t);
@@ -232,20 +250,29 @@ begin
     exit;
 
   result := true;
+  TaktNr := 0;
   iEvent := 1;
   offset := 0;
+  t32takt := 0;
   InTuplet := false;
   midiOffset := Events[0].var_len;
   Voice := nil;
   while result and (iEvent < Length(Events)) do
   begin
-    if offset mod Header.TicksPerMeasure = 0 then
+    if Header.SetTimeSignature(Events[iEvent], Events[iEvent].Bytes) then
+    begin
+      t32takt := 0;
+      inc(iEvent);
+      if iEvent = Length(Events) then
+        break;
+    end;
+    if round(t32takt) = 0 then
     begin
       Voice := LyricsTree.AppendChildNode('voice');
-      t32takt := 0;
+      t32takt := 32.0*Header.measureFact / Header.measureDiv;
+      inc(TaktNr);
     end;
-    if iEvent = 16 then
-      iEnd := iEvent;
+
     delta := midiOffset - offset;
     iEnd := iEvent;
     NextLyrics := delta = 0;
@@ -260,8 +287,8 @@ begin
     if iEnd = Length(Events) then
       dec(iEnd);
     // Taktgrenze prüfen
-    if Header.TicksPerMeasure < offset mod Header.TicksPerMeasure + delta then
-      delta := Header.TicksPerMeasure - offset mod Header.TicksPerMeasure;
+    if Header.MeasureRestTicks(t32takt) < delta then
+      delta := Header.MeasureRestTicks(t32takt);
 
     AddRest(InTuplet);
     if not result then
@@ -269,11 +296,9 @@ begin
       result := true;
       repeat
         // skip measure
-        delta := Header.TicksPerMeasure - offset mod Header.TicksPerMeasure;
-        if delta = 0 then
-          delta := Header.TicksPerMeasure;
+        delta := Header.MeasureRestTicks(t32takt);
         AddRest(InTuplet);
-      until not Result or ((offset mod Header.TicksPerMeasure) = 0);
+      until not Result or (Header.MeasureRestTicks(t32takt) <= 0);
       while (iEvent < Length(Events)) and
             (offset > midiOffset) do
       begin
@@ -286,7 +311,7 @@ begin
       no := 0;
       while iEvent <= iEnd do
       begin
-        s := UTF8ToString(Events[iEvent].ansi);
+        s := Events[iEvent].code[CodePage];
         if trim(s) <> '' then
         begin
           Child := Rest.AppendChildNode('Lyrics');
@@ -312,9 +337,9 @@ begin
   // letzten Takt füllen
   if result and (Voice <> nil) then
   begin
-    while result and ((offset mod Header.TicksPerMeasure) > 0) do
+    while result and (Header.MeasureRestTicks(t32takt) > 0) do
     begin
-      delta := Header.TicksPerMeasure - (offset mod Header.TicksPerMeasure);
+      delta := Header.MeasureRestTicks(t32takt);
       InTuplet := false;
       AddRest(InTuplet);
     end;
@@ -532,24 +557,30 @@ end;
 
 function TForm1.Merge(FileName: string): boolean;
 var
+  IsKaraoke: boolean;
   KaraokeChannel: integer;
-  lyricsStaff: integer;
+  Staffs: array of KXmlNode;
   events: TEventArray;
   Event: TMidiEvent;
   hasLyrics: array of integer;
   hasText: array of integer;
   hasSound: array of integer;
   Root: KXmlNode;
-  Score, Staff, Measure, Chord, Voice, Lyrics, Staffs, FirstStaff: KXmlNode;
-  Child, LyricsTree: KXmlNode;
+  Score, Staff, Measure, Chord, Voice, Lyrics: KXmlNode;
+  Child, LyricsTree, FirstStaff: KXmlNode;
   Ext: string;
   i, k, iScore: integer;
   iStaff, iVoice, iChord, iMeasure: integer;
   MidiEvents: TMidiEventArray;
   Tracks: TTrackEventArray;
-  LyricStaffNo: integer;
+  CodePage: integer;
 begin
   result := false;
+  case cbxCodePage.ItemIndex of
+    0: CodePage := CP_UTF8;
+    1: CodePage := 28591; // Ansi-Code iso-8859-1
+    else CodePage := CP_UTF8;
+  end;
   Ext := LowerCase(ExtractFileExt(FileName));
   SetLength(FileName, Length(FileName) - Length(Ext));
 
@@ -569,12 +600,15 @@ begin
     Events.Free;
     exit;
   end;
-//  Events.SaveSimpleMidiToFile(FileName + '.txt');
+{$ifdef TEST}
+  Events.SaveSimpleMidiToFile(FileName + '.txt');
+{$endif}
   Events.DetailHeader.smallestFraction := 16; // 16th
   SetLength(hasText, Events.TrackCount);
   SetLength(hasSound, Events.TrackCount);
   SetLength(hasLyrics, Events.TrackCount);
   KaraokeChannel := -1;
+  IsKaraoke := false;
   for i := 0 to Events.TrackCount-1 do
   begin
     hasLyrics[i] := 0;
@@ -595,29 +629,12 @@ begin
         inc(hasSound[i]);
     end;
     if (hasSound[i] = 0) and (hasText[i] > 10) and (hasLyrics[i] = 0) then
+    begin
+      IsKaraoke := true;
       KaraokeChannel := i
-    else
-    if ((KaraokeChannel < 0) and (hasLyrics[i] > 10)) or
-       (hasLyrics[i] > hasLyrics[KaraokeChannel]) then
-      KaraokeChannel := i;
+    end;
   end;
-
-  i := 1;
-  k := 1;
-  // Lyrics entfernen
-  while (i < Length(Events.Track[KaraokeChannel+1])) do
-  begin
-    with Events.Track[KaraokeChannel+1][i] do
-      if (command <> $ff) or (d1 <> 5) or
-         not (Events.Track[KaraokeChannel+1][i][0] in [#0..#31]) then
-      begin
-        Events.Track[KaraokeChannel+1][k] := Events.Track[KaraokeChannel+1][i];
-        inc(k);
-      end else
-        inc(Events.Track[KaraokeChannel+1][k-1].var_len, Events.Track[KaraokeChannel+1][i].var_len);
-    inc(i);
-  end;
-  SetLength(Events.Track[KaraokeChannel+1], k);
+  Events.InsertMeasureChanges;
 
   if not FileExists(FileName + '.mscz') and
      not FileExists(FileName + '.mscx') then
@@ -647,29 +664,16 @@ begin
 
   // remove lyrics
   FirstStaff := nil;
-  lyricsStaff := -1;
-  LyricStaffNo := -1;
+  SetLength(Staffs, 0);
   for iScore := 0 to Score.Count-1 do
   begin
     Staff := Score[iScore];
-    if Staff.Name = 'Part' then
-    begin
-      Child := Score[iScore].HasChild('trackName');
-      if (Child <> nil) and (LyricStaffNo < 0) and
-         (Pos('lyric', LowerCase(Child.Value)) > 0) then
-      begin
-        Child := Score[iScore].HasChild('Staff');
-        if (Child <> nil) then
-          LyricStaffNo := StrToIntDef(Child.Attributes['id'], -1);
-      end;
-    end else
     if Staff.Name = 'Staff' then
     begin
-      if (LyricStaffNo >= 0) and
-         (LyricStaffNo = StrToIntDef(Staff.Attributes['id'], -1)) then
-        FirstStaff := Staff;
       if FirstStaff = nil then
         FirstStaff := Staff;
+      SetLength(Staffs, Length(Staffs)+1);
+      Staffs[Length(Staffs)-1] := Staff;
       for iStaff := 0 to Staff.Count-1 do
       begin
         Measure := Staff[iStaff];
@@ -691,11 +695,6 @@ begin
                     Lyrics := Chord[iChord];
                     if Lyrics.Name = 'Lyrics' then
                     begin
-                      if lyricsStaff = -1 then
-                      begin
-                        lyricsStaff := iScore;
-                      //  FirstStaff := Staff;
-                      end;
                       Chord.RemoveChild(Lyrics)
                     end else
                       inc(iChord);
@@ -712,32 +711,56 @@ begin
 
   // Zu jedem Staff in MuseScore gibt es ein Staff in Score
 
-  result := (FirstStaff <> nil) and (KaraokeChannel >= 0);
+  result := Length(Staffs) > 0;
   if result then
   begin
-    LyricsTree := nil;
-    TEventArray.Quantize(Events.Track[KaraokeChannel], Events.DetailHeader);
-    ReduceToLyrics(Events.Track[KaraokeChannel], true, Events.DetailHeader);
-    result := BuildLyricsTree(LyricsTree, Events.Track[KaraokeChannel], Events.DetailHeader);
-    if result then
+    if not IsKaraoke then
     begin
-//      LyricsTree.SaveToXmlFile(FileName + '_tree.xml');
-      AddVoice(FirstStaff, LyricsTree, Events.DetailHeader);
-      ReduceVoice(FirstStaff, Events.DetailHeader);
+      for i := 0 to Length(hasLyrics)-1 do
+      begin
+        if result and (hasLyrics[i] > 10)  and (i < Length(Staffs)) then
+        begin
+          LyricsTree := nil;
+          TEventArray.Quantize(Events.Track[i], Events.DetailHeader);
+          ReduceToLyrics(Events.Track[i], true, Events.DetailHeader);
+          result := BuildLyricsTree(LyricsTree, Events.Track[i], Events.DetailHeader, CodePage);
+          if result then
+          begin
+      {$ifdef TEST}
+    //        LyricsTree.SaveToXmlFile(FileName + '_tree.xml');
+      {$endif}
+            AddVoice(Staffs[i], LyricsTree, Events.DetailHeader);
+            ReduceVoice(Staffs[i], Events.DetailHeader);
+          end;
+          LyricsTree.Free;
+        end;
+      end;
+    end else begin
+      LyricsTree := nil;
+      TEventArray.Quantize(Events.Track[KaraokeChannel], Events.DetailHeader);
+      ReduceToLyrics(Events.Track[KaraokeChannel], true, Events.DetailHeader);
+      result := BuildLyricsTree(LyricsTree, Events.Track[KaraokeChannel], Events.DetailHeader, CodePage);
+      if result then
+      begin
+        AddVoice(FirstStaff, LyricsTree, Events.DetailHeader);
+        ReduceVoice(FirstStaff, Events.DetailHeader);
+      end;
+      LyricsTree.Free;
     end;
-    LyricsTree.Free;
   end;
   if result then
   begin
     try
       if FileExists(FileName + '_.mscz') then
       begin
-         if Application.MessageBox(PChar(Format('File "%s" exists. Overwrite it?', [FileName + '_.mscz'])),
-                                   'Overwrite?', MB_YESNO) <> IDYES then
-           exit;
+        if Application.MessageBox(PChar(Format('File "%s" exists. Overwrite it?', [FileName + '_.mscz'])),
+                                  'Overwrite?', MB_YESNO) <> IDYES then
+          exit;
       end;
       Root.SaveToMsczFile(FileName + '_.mscz');
-//      Root.SaveToXmlFile(FileName + '_.xml', '<?xml version="1.0" encoding="UTF-8"?>'#13#10);
+{$ifdef TEST}
+      Root.SaveToXmlFile(FileName + '_.xml', '<?xml version="1.0" encoding="UTF-8"?>'#13#10);
+{$endif}
     finally
       Root.Free;
       Events.Free;
@@ -763,3 +786,5 @@ begin
 end;
 
 end.
+
+
