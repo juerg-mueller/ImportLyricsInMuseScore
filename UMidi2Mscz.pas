@@ -31,7 +31,7 @@ implementation
 
 {$R *.dfm}
 
-{$define TEST}
+{$define _TEST}
 
 uses
   UMyMidiStream, UMidiDataStream, UEventArray, UXmlParser, UXmlNode;
@@ -271,6 +271,7 @@ begin
       Voice := LyricsTree.AppendChildNode('voice');
       t32takt := 32.0*Header.measureFact / Header.measureDiv;
       inc(TaktNr);
+      Voice.Attributes['id'] := IntToStr(TaktNr);
     end;
 
     delta := midiOffset - offset;
@@ -726,9 +727,6 @@ begin
           result := BuildLyricsTree(LyricsTree, Events.Track[i], Events.DetailHeader, CodePage);
           if result then
           begin
-      {$ifdef TEST}
-    //        LyricsTree.SaveToXmlFile(FileName + '_tree.xml');
-      {$endif}
             AddVoice(Staffs[i], LyricsTree, Events.DetailHeader);
             ReduceVoice(Staffs[i], Events.DetailHeader);
           end;
@@ -742,6 +740,9 @@ begin
       result := BuildLyricsTree(LyricsTree, Events.Track[KaraokeChannel], Events.DetailHeader, CodePage);
       if result then
       begin
+{$ifdef TEST}
+        LyricsTree.SaveToXmlFile(FileName + '_tree.xml');
+{$endif}
         AddVoice(FirstStaff, LyricsTree, Events.DetailHeader);
         ReduceVoice(FirstStaff, Events.DetailHeader);
       end;
